@@ -1,6 +1,5 @@
 from google.cloud import bigquery
 
-
 SERVICE_ACCOUNT_KEY = r'/Users/sreeram/Projects/GoogleCloud/bigquery-demo-385800-0deb753c8487.json'
 
 # create a bigquery client
