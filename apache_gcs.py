@@ -1,7 +1,7 @@
-
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
 import os
+import logging
 
 path_to_account = '/Users/sreeram/Projects/GoogleCloud/bigquery-demo-385800-0deb753c8487.json'
 
@@ -9,7 +9,7 @@ os.environ['GOOGLE_APPLICATION_CREDITIONALS'] = path_to_account
 
 pipeline_options = PipelineOptions(
     flags=None,
-    runner='DataflowRunner',
+    runner='DirectRunner',
     project='bigquery-demo-385800',
     region='us-central1',
     job_name='data-flow-job-gcstobq',
@@ -54,7 +54,6 @@ cleaned_data = (
 delivered_orders = (
 	cleaned_data
 	| 'delivered filter' >> beam.Filter(lambda row: row.split(',')[8].lower() == 'delivered')
-
 )
 
 other_orders = (
@@ -100,7 +99,7 @@ def to_json(csv_str):
                  }
 
     return json_str
-	
+
 table_schema = 'customer_id:STRING,date:STRING,timestamp:STRING,order_id:STRING,items:STRING,amount:STRING,mode:STRING,restaurant:STRING,status:STRING,ratings:STRING,feedback:STRING,new_col:STRING'
 
 #project-id:dataset_id.table_id
@@ -128,4 +127,6 @@ other_table_spec = 'bigquery-demo-385800.dataset_python.other_status_orders'
 	)
 )
 
-p.run()
+if __name__ == '__main__':
+  logging.getLogger().setLevel(logging.INFO)
+  p.run()
