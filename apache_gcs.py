@@ -1,27 +1,23 @@
-#project-id:dataset_id.table_id
-delivered_table_spec = 'bigquery-demo-385800.dataset_python.delivered_orders'
-#project-id:dataset_id.table_id
-other_table_spec = 'bigquery-demo-385800.dataset_python.other_orders'
 
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
-import argparse
-from google.cloud import bigquery
+import os
 
-parser = argparse.ArgumentParser()
+path_to_account = '/Users/sreeram/Projects/GoogleCloud/bigquery-demo-385800-0deb753c8487.json'
 
-parser.add_argument('--input',
-                      dest='input',
-                      required=True,
-                      help='Input file to process.')
-                      
-path_args, pipeline_args = parser.parse_known_args()
+os.environ['GOOGLE_APPLICATION_CREDITIONALS'] = path_to_account
 
-inputs_pattern = path_args.input
+pipeline_options = PipelineOptions(
+    flags=None,
+    runner='DataflowRunner',
+    project='bigquery-demo-385800',
+    region='us-central1',
+    job_name='data-flow-job-gcstobq',
+    temp_location='gs://temp_bucket_randomtrees/temp',
+    staging_location='gs://temp_bucket_randomtrees/temp'
+)
 
-options = PipelineOptions(pipeline_args)
-
-p = beam.Pipeline(options = options)
+p = beam.Pipeline(options = pipeline_options)
 
 def remove_last_colon(row):		# OXJY167254JK,11-09-2020,8:11:21,854A854,Chow M?ein:,65,Cash,Sadabahar,Delivered,5,Awesome experience
     cols = row.split(',')		# [(OXJY167254JK) (11-11-2020) (8:11:21) (854A854) (Chow M?ein:) (65) (Cash) ....]
@@ -45,9 +41,10 @@ def remove_special_characters(row):    # oxjy167254jk,11-11-2020,8:11:21,854a854
 def print_row(row):
     print (row)
 
+
 cleaned_data = (
 	p
-	| beam.io.ReadFromText(inputs_pattern, skip_header_lines=1)
+	| beam.io.ReadFromText('gs://demo_bucket_randomtrees/food_daily.csv', skip_header_lines=1)
 	| beam.Map(remove_last_colon)
 	| beam.Map(lambda row: row.lower())
 	| beam.Map(remove_special_characters)
@@ -71,19 +68,19 @@ other_orders = (
  | 'print total' >> beam.Map(print_row)
 )
 
-# BigQuery 
-client = bigquery.Client()
+(delivered_orders
+ | 'count delivered' >> beam.combiners.Count.Globally()
+ | 'delivered map' >> beam.Map(lambda x: 'Delivered count:'+str(x))
+ | 'print delivered count' >> beam.Map(print_row)
+ )
 
-dataset_id = "{}.dataset_food_orders_latest".format(client.project)
 
-# client.get_dataset(dataset_id)
+(other_orders
+ | 'count others' >> beam.combiners.Count.Globally()
+ | 'other map' >> beam.Map(lambda x: 'Others count:'+str(x))
+ | 'print undelivered' >> beam.Map(print_row)
+ )
 
-dataset = bigquery.Dataset(dataset_id)
-
-dataset.location = "US"
-dataset.description = "dataset for food orders"
-
-dataset_ref = client.create_dataset(dataset, timeout=30)
 	
 def to_json(csv_str):
     fields = csv_str.split(',')
@@ -106,6 +103,11 @@ def to_json(csv_str):
 	
 table_schema = 'customer_id:STRING,date:STRING,timestamp:STRING,order_id:STRING,items:STRING,amount:STRING,mode:STRING,restaurant:STRING,status:STRING,ratings:STRING,feedback:STRING,new_col:STRING'
 
+#project-id:dataset_id.table_id
+delivered_table_spec = 'bigquery-demo-385800.dataset_python.delivered_orders'
+#project-id:dataset_id.table_id
+other_table_spec = 'bigquery-demo-385800.dataset_python.other_status_orders'
+
 (delivered_orders
 	| 'delivered to json' >> beam.Map(to_json)
 	| 'write delivered' >> beam.io.WriteToBigQuery(
@@ -126,10 +128,4 @@ table_schema = 'customer_id:STRING,date:STRING,timestamp:STRING,order_id:STRING,
 	)
 )
 
-from apache_beam.runners.runner import PipelineState
-ret = p.run()
-if ret.state == PipelineState.DONE:
-    print('Success!!!')
-else:
-    print('Error Running beam pipeline')
-
+p.run()
