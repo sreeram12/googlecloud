@@ -9,10 +9,10 @@ os.environ['GOOGLE_APPLICATION_CREDITIONALS'] = path_to_account
 
 pipeline_options = PipelineOptions(
     flags=None,
-    runner='DirectRunner', # DirectRunner runs on local. DataflowRunner runs on Cloud
+    runner='DataflowRunner', # DirectRunner runs on local. DataflowRunner runs on Cloud
     project='bigquery-demo-385800',
     region='us-central1',
-    job_name='data-flow-job-bqagg3',
+    job_name='data-flow-job-bqagg5',
     temp_location='gs://temp_bucket_randomtrees/temp',
     staging_location='gs://temp_bucket_randomtrees/stage'
 )
@@ -28,10 +28,10 @@ full_table = (
 
 class ConvertTupleToJSON(beam.DoFn):
     def process(self, element):
-        json_data = json.dumps({
+        json_data = {
             "gender": element[0],
             "total_count": element[1]
-        })
+        }
         yield json_data
 
 aggregated_table = (
@@ -40,26 +40,21 @@ aggregated_table = (
     | "GroupByGender" >> beam.GroupByKey()
     | "AggregateCount" >> beam.Map(lambda gender_count: (gender_count[0], sum(gender_count[1])))
     | 'convert to JSON' >> beam.ParDo(ConvertTupleToJSON())
-    | beam.Map(print)
+    # | beam.Map(print)
 )
 
 copy_table_spec = 'bigquery-demo-385800.dataset_python.copied_table'
 aggregated_table_spec = 'bigquery-demo-385800.dataset_python.aggregated_table'
 
 schema_table = 'name:STRING,gender:STRING,count:INTEGER'
-schema_aggregation = {
-    "fields": [
-        {"name": "gender", "type": "STRING"},
-        {"name": "total_count", "type": "INTEGER"}
-    ]
-}
+schema_aggregation = 'gender:STRING,total_count:INTEGER'
 
-# (full_table
-#  | 'write full table' >> beam.io.WriteToBigQuery(
-#      copy_table_spec,
-#      schema=schema_table,
-#      create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
-#  ))
+(full_table
+ | 'write full table' >> beam.io.WriteToBigQuery(
+     copy_table_spec,
+     schema=schema_table,
+     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
+ ))
 
 (aggregated_table
  | 'write aggregated table' >> beam.io.WriteToBigQuery(
