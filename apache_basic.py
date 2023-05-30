@@ -1,5 +1,4 @@
 import apache_beam as beam
-import json
 from apache_beam.options.pipeline_options import PipelineOptions
 import os
 

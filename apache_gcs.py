@@ -41,7 +41,6 @@ def remove_special_characters(row):    # oxjy167254jk,11-11-2020,8:11:21,854a854
 def print_row(row):
     print (row)
 
-
 cleaned_data = (
 	p
 	| beam.io.ReadFromText('gs://demo_bucket_randomtrees/food_daily.csv', skip_header_lines=1)

@@ -24,22 +24,12 @@ destination_file_path = 'yob1880_copy.csv'
 
 pipeline = beam.Pipeline(options=pipeline_options)
 
-def count_rows(row):
-    yield row
-    # Increment the count for each row
-    count_rows.row_count += 1
-
-count_rows.row_count = 0
+row_count = 0
 
 full_table = (
     pipeline
     | 'read table gcs' >> beam.io.ReadFromText(f'gs://{source_bucket}/{source_file_path}', skip_header_lines = 1)
-    | 'Count Rows' >> beam.FlatMap(count_rows)
 )
-# log the number of rows in the file
-full_table | 'Log Row Count' >> beam.Map(
-        lambda element: logging.info(f"Number of rows in file: {count_rows.row_count}")
-    )
 
 table_spec = 'bigquery-demo-385800.dataset_python.copied_table'
 schema_table = 'name:STRING,gender:STRING,count:INTEGER'
@@ -50,11 +40,28 @@ write_to_bq = (full_table
      schema=schema_table,
      create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
  ))
-# log number of rows inserted
-write_to_bq | 'Log Row Count' >> beam.Map(
-        lambda element: logging.info(f"Successfully Inserted Rows: {element['num_rows_inserted']}")
-    )
 
+class LogInsertCountFn(beam.DoFn):
+    def process(self, element, insert_count=beam.DoFn.SideInputParam):
+        insert_count_value = len(element)
+        logging.info(f"Number of Rows Inserted: {insert_count_value}")
+        yield element
+# Count the number of rows inserted per key
+key_counts = (
+    write_to_bq
+    | 'Assign Key' >> beam.Map(lambda row: ('row_count_key', 1))
+    | 'Count Rows Per Key' >> beam.CombinePerKey(sum)
+)
+# Sum up the counts across all keys
+insert_count = (
+    key_counts
+    | 'Sum Counts Globally' >> beam.combiners.Count.Globally()
+)
+# log number of rows inserted
+insert_count | 'Log Insert Count' >> beam.ParDo(LogInsertCountFn(), insert_count=beam.pvalue.AsDict(key_counts))
+
+
+# move file to new location
 (full_table
  | 'move file to new location' >> beam.io.WriteToText(f'gs://{source_bucket}/{source_file_path}')
 )
@@ -66,4 +73,5 @@ full_table | 'Log Destination File Path' >> beam.Map(
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)
-  pipeline.run()
+  result = pipeline.run()
+  result.wait_until_finish()
