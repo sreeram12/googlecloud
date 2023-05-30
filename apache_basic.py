@@ -39,8 +39,7 @@ aggregated_table = (
     | "ExtractGenderCount" >> beam.Map(lambda row: (row["gender"], row["count"]))
     | "GroupByGender" >> beam.GroupByKey()
     | "AggregateCount" >> beam.Map(lambda gender_count: (gender_count[0], sum(gender_count[1])))
-    | 'convert to JSON' >> beam.ParDo(ConvertTupleToJSON())
-    # | beam.Map(print)
+    | 'convert to JSON' >> beam.ParDo(ConvertTupleToJSON()) # if facing JSON not readable issue then turn the data into a dict manually
 )
 
 copy_table_spec = 'bigquery-demo-385800.dataset_python.copied_table'

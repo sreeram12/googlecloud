@@ -127,6 +127,4 @@ other_table_spec = 'bigquery-demo-385800.dataset_python.other_status_orders'
 	)
 )
 
-if __name__ == '__main__':
-  logging.getLogger().setLevel(logging.INFO)
-  p.run()
+p.run()
