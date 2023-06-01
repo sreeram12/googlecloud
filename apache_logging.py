@@ -8,7 +8,7 @@ path_to_account = '/Users/sreeram/Projects/GoogleCloud/bigquery-demo-385800-0deb
 os.environ['GOOGLE_APPLICATION_CREDITIONALS'] = path_to_account
 
 p_options= {
-    'runner':'DataflowRunner', # DirectRunner runs on local. DataflowRunner runs on Cloud
+    'runner':'DirectRunner', # DirectRunner runs on local. DataflowRunner runs on Cloud
     'project':'bigquery-demo-385800',
     'region':'us-central1',
     'job_name':'data-flow-job-gcslog',

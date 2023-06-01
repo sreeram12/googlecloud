@@ -80,35 +80,36 @@ closest_timestamp_str = closest_timestamp | 'Convert to String' >> beam.Map(conv
 filtered_table_spec = 'bigquery-demo-385800.dataset_python.service_request_data_extract'
 filtered_schema = 'unique_key:STRING, complaint:STRING, source:STRING, status:STRING, status_change_date:TIMESTAMP, created_date:TIMESTAMP, last_update_date:TIMESTAMP, close_date:TIMESTAMP, address:STRING, street_num:STRING, street_name:STRING, city:STRING, zip:INTEGER, county:STRING, x_coords:STRING, y_coords:FLOAT, lat:FLOAT, long:FLOAT,location:STRING, council_district:INTEGER, map_page:STRING, map_tile:STRING'
 
-# class ConvertToJSON(beam.DoFn):
-#     def process(self, element):
-#         json_data = {
-#             "unique_key": element[0],
-#             "complaint": element[1],
-#             "source": element[2],
-#             "status": element[3],
-#             "status_change_date": element[4],
-#             "created_date": element[5],
-#             "last_update_date": element[6],
-#             "close_date": element[7],
-#             "address": element[8],
-#             "street_num": element[9],
-#             "street_name": element[10],
-#             "city": element[11],
-#             "zip": element[12],
-#             "county": element[13],
-#             "x_coords": element[14],
-#             "y_coords": element[15],
-#             "lat": element[16],
-#             "long": element[17],
-#             "location": element[18],
-#             "council_district": element[19],
-#             "map_page": element[20],
-#             "map_tile": element[21]
-#         }
-#         yield json_data
+class ConvertToJSON(beam.DoFn):
+    def process(self, element):
+        json_data = {
+            "unique_key": element['unique_key'],
+            "complaint": element['complaint_description'],
+            "source": element['source'],
+            "status": element['status'],
+            "status_change_date": element['status_change_date'],
+            "created_date": element['created_date'],
+            "last_update_date": element['last_update_date'],
+            "close_date": element['close_date'],
+            "address": element['incident_address'],
+            "street_num": element['street_number'],
+            "street_name": element['street_name'],
+            "city": element['city'],
+            "zip": element['incident_zip'],
+            "county": element['county'],
+            "x_coords": element['state_plane_x_coordinate'],
+            "y_coords": element['state_plane_y_coordinate'],
+            "lat": element['latitude'],
+            "long": element['longitude'],
+            "location": element['location'],
+            "council_district": element['council_district_code'],
+            "map_page": element['map_page'],
+            "map_tile": element['map_tile']
+        }
+        yield json_data
 
 (filtered_data
+    | 'convert to dict' >> beam.ParDo(ConvertToJSON())
     | 'Write to BigQuery' >> beam.io.WriteToBigQuery(
         filtered_table_spec,
         schema=filtered_schema,
