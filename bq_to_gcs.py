@@ -11,7 +11,7 @@ pipeline_options = PipelineOptions(
     runner='DataflowRunner', # DirectRunner runs on local. DataflowRunner runs on Cloud
     project='bigquery-demo-385800',
     region='us-central1',
-    job_name='data-flow-job-gcsbq',
+    job_name='data-flow-job-bqgcs2',
     temp_location='gs://temp_bucket_randomtrees/temp',
     staging_location='gs://temp_bucket_randomtrees/stage'
 )
@@ -28,7 +28,7 @@ full_table = (
 
 # Write to GCS
 full_table | 'Write to GCS' >> beam.io.WriteToText(
-        'gs://temp_bucket_randomtrees/frombq.csv',
+        'gs://temp_bucket_randomtrees/frombq',
         file_name_suffix='.csv',
         header='name,gender,count'
     )
