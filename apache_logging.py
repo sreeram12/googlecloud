@@ -70,7 +70,7 @@ rejects_count = (log_table.rejected
 # file name, inserts, rejects, total rows, timestamp
 log_table_spec = 'bigquery-demo-385800.dataset_python.audit_table'
 log_table_schema = 'filename:STRING,inserts:INTEGER,rejects:INTEGER,total:INTEGER,timestamp:TIMESTAMP'
-row_data = {'filename': 'yob1880.csv', 'inserts': inserts_count, 'rejects': rejects_count, 'total': inserts_count, 'timestamp': datetime.datetime.now()}
+row_data = {'filename': 'yob1880.csv', 'inserts': inserts_count, 'rejects': rejects_count, 'total': inserts_count+rejects_count, 'timestamp': datetime.datetime.now()}
 
 row = pipeline | 'create row' >> beam.Create(row_data)
 log_table_write = (row
