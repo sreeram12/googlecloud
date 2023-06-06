@@ -13,10 +13,10 @@ path_to_account = '/Users/sreeram/Projects/GoogleCloud/bigquery-demo-385800-0deb
 os.environ['GOOGLE_APPLICATION_CREDITIONALS'] = path_to_account
 
 p_options= {
-    'runner':'DirectRunner', # DirectRunner runs on local. DataflowRunner runs on Cloud
+    'runner':'DataflowRunner', # DirectRunner runs on local. DataflowRunner runs on Cloud
     'project':'bigquery-demo-385800',
     'region':'us-central1',
-    'job_name':'data-flow-job-lastextract2-4',
+    'job_name':'data-flow-job-lastextract3',
     'temp_location':'gs://temp_bucket_randomtrees/temp',
     'staging_location':'gs://temp_bucket_randomtrees/stage',
     'save_main_session':True
@@ -33,6 +33,7 @@ pipeline = beam.Pipeline(options=pipeline_options)
 
 table_spec = 'bigquery-demo-385800.dataset_python.service_request_data'
 # read from bq table
+# can use a direct sub_query
 full_table = (
     pipeline
     | 'ReadTable' >> beam.io.ReadFromBigQuery(table=table_spec)
@@ -43,78 +44,9 @@ filtered_data = full_table | 'Filter since last extract' >> beam.Filter(filter_s
 
 # Write the filtered data to GCS
 filtered_data | 'Write to GCS' >> beam.io.WriteToText(
-    'gs://temp_bucket_randomtrees/extracted_data.csv',
+    f'gs://temp_bucket_randomtrees/extracted_data_{datetime.datetime.now()}',
     file_name_suffix='.csv',
     header='unique_key, complaint, source, status, status_change_date, created_date, last_updat_date, close_date, address, street_num, street_name, city, zip, county, x_coords, y_coords, lat, long, location,  council_district, map_page, map_tile'
-)
-
-# get the closest date to the current date in the filtered data
-class ClosestTimestampFn(beam.CombineFn):
-    def create_accumulator(self):
-        return None
-
-    def add_input(self, accumulator, input):
-        current_timestamp = input
-        if accumulator is None or abs(current_timestamp - datetime.datetime.now(pytz.utc)) < abs(accumulator - datetime.datetime.now(pytz.utc)):
-            return current_timestamp
-        else:
-            return accumulator
-
-    def merge_accumulators(self, accumulators):
-        return min(accumulators, key=lambda x: abs(x - datetime.datetime.now(pytz.utc)))
-
-    def extract_output(self, accumulator):
-        return accumulator.strftime("%Y%m%d_%H%M%S")
-
-closest_timestamp = (
-  filtered_data
-  | 'Extract Timestamp' >> beam.Map(lambda element: element['created_date'])
-  | 'Find Closest Timestamp' >> beam.CombineGlobally(ClosestTimestampFn())
-)
-def convert_to_string(element):
-    return element.strftime("%Y%m%d_%H%M%S")
-
-closest_timestamp_str = closest_timestamp | 'Convert to String' >> beam.Map(convert_to_string)
-
-# write filtered data to a new BQ table and save the date of the previous extract
-filtered_table_spec = 'bigquery-demo-385800.dataset_python.service_request_data_extract'
-filtered_schema = 'unique_key:STRING, complaint:STRING, source:STRING, status:STRING, status_change_date:TIMESTAMP, created_date:TIMESTAMP, last_update_date:TIMESTAMP, close_date:TIMESTAMP, address:STRING, street_num:STRING, street_name:STRING, city:STRING, zip:INTEGER, county:STRING, x_coords:STRING, y_coords:FLOAT, lat:FLOAT, long:FLOAT,location:STRING, council_district:INTEGER, map_page:STRING, map_tile:STRING'
-
-class ConvertToJSON(beam.DoFn):
-    def process(self, element):
-        json_data = {
-            "unique_key": element['unique_key'],
-            "complaint": element['complaint_description'],
-            "source": element['source'],
-            "status": element['status'],
-            "status_change_date": element['status_change_date'],
-            "created_date": element['created_date'],
-            "last_update_date": element['last_update_date'],
-            "close_date": element['close_date'],
-            "address": element['incident_address'],
-            "street_num": element['street_number'],
-            "street_name": element['street_name'],
-            "city": element['city'],
-            "zip": element['incident_zip'],
-            "county": element['county'],
-            "x_coords": element['state_plane_x_coordinate'],
-            "y_coords": element['state_plane_y_coordinate'],
-            "lat": element['latitude'],
-            "long": element['longitude'],
-            "location": element['location'],
-            "council_district": element['council_district_code'],
-            "map_page": element['map_page'],
-            "map_tile": element['map_tile']
-        }
-        yield json_data
-
-(filtered_data
-    | 'convert to dict' >> beam.ParDo(ConvertToJSON())
-    | 'Write to BigQuery' >> beam.io.WriteToBigQuery(
-        filtered_table_spec,
-        schema=filtered_schema,
-        write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
-    )
 )
 
 pipeline.run()
