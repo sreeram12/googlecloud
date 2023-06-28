@@ -1,6 +1,7 @@
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
-from apache_beam.io.gcp.internal.clients import bigquery
+from google.cloud.bigquery import SchemaField
+from google.cloud import bigquery
 import os
 import logging
 import gcsfs
@@ -17,7 +18,7 @@ p_options= {
     'job_name':'data-flow-job-gcslog4',
     'temp_location':'gs://temp_bucket_randomtrees/temp',
     'staging_location':'gs://temp_bucket_randomtrees/stage',
-    'save_main_session':True
+    # 'save_main_session':True
 }
 pipeline_options = PipelineOptions(flags=None, **p_options)
 
@@ -66,20 +67,43 @@ rejects_count = (log_table.rejected
                  | 'convert reject to int' >> beam.Map(lambda count: int(count))
 )
 
+inserts_count | 'print insert type' >> beam.Map(print_type) | 'print insert value' >> beam.Map(print)
+rejects_count | 'print reject type' >> beam.Map(print_type) | 'print reject value' >> beam.Map(print)
+
 # insert into log table
 # file name, inserts, rejects, total rows, timestamp
-log_table_spec = 'bigquery-demo-385800.dataset_python.audit_table'
-log_table_schema = 'filename:STRING,inserts:INTEGER,rejects:INTEGER,total:INTEGER,timestamp:TIMESTAMP'
-row_data = {'filename': 'demo_bucket_randomtrees/yob1880.csv', 'inserts': inserts_count, 'rejects': rejects_count, 'total': inserts_count+rejects_count, 'timestamp': datetime.datetime.now()}
 
-row = pipeline | 'create row' >> beam.Create(row_data)
-log_table_write = (row
-  | 'write log table' >> beam.io.WriteToBigQuery(
-     log_table_spec,
-     schema=log_table_schema,
-     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
-     write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND
- ))
+SERVICE_ACCOUNT_KEY = r'/Users/sreeram/Projects/GoogleCloud/bigquery-demo-385800-0deb753c8487.json'
+
+client = bigquery.Client.from_service_account_json(SERVICE_ACCOUNT_KEY)
+schema = [
+    SchemaField("filename", "STRING"),
+    SchemaField("inserts", "INTEGER"),
+    SchemaField("rejects", "INTEGER"),
+    SchemaField("total", "INTEGER"),
+    SchemaField("date_inserted", "TIMESTAMP")
+]
+
+table_ref = client.dataset("dataset_python").table("audit_table")
+table = bigquery.Table(table_ref, schema=schema)
+client.create_table(table, exists_ok=True)
+
+row_data = [("demo_bucket_randomtrees/yob1880.csv", 2000, 0, 2000, datetime.datetime.now())]
+
+client.insert_rows(table, row_data)
+
+# log_table_spec = 'bigquery-demo-385800.dataset_python.audit_table'
+# log_table_schema = 'filename:STRING,inserts:INTEGER,rejects:INTEGER,total:INTEGER,timestamp:TIMESTAMP'
+# row_data = {'filename': 'demo_bucket_randomtrees/yob1880.csv', 'inserts': inserts_count, 'rejects': rejects_count, 'total': inserts_count+rejects_count, 'timestamp': datetime.datetime.now()}
+
+# row = pipeline | 'create row' >> beam.Create(row_data)
+# log_table_write = (row
+#   | 'write log table' >> beam.io.WriteToBigQuery(
+#      log_table_spec,
+#      schema=log_table_schema,
+#      create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
+#      write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND
+#  ))
 
 # write inserted rows into its own table
 table_spec = 'bigquery-demo-385800.dataset_python.inserts_table_logging'
